@@ -1,8 +1,5 @@
-import type { GetServerSidePropsContext, GetServerSidePropsResult } from "next";
-import { z } from "zod";
-
-import { createDefaultInstallation } from "@calcom/app-store/_utils/installation";
 import { filterEventTypesWhereLocationUpdateIsAllowed } from "@calcom/app-store/_utils/getBulkEventTypes";
+import { createDefaultInstallation } from "@calcom/app-store/_utils/installation";
 import { appStoreMetadata } from "@calcom/app-store/appStoreMetaData";
 import type { LocationObject } from "@calcom/app-store/locations";
 import { isConferencing as isConferencingApp } from "@calcom/app-store/utils";
@@ -14,12 +11,14 @@ import { getPlaceholderAvatar } from "@calcom/lib/defaultAvatarImage";
 import prisma from "@calcom/prisma";
 import { Prisma } from "@calcom/prisma/client";
 import { eventTypeBookingFields } from "@calcom/prisma/zod-utils";
-
+import { appRequiresSetupForm } from "@calcom/web/components/apps/appsWithSetupForm";
+import type { GetServerSidePropsContext, GetServerSidePropsResult } from "next";
+import { z } from "zod";
 import { STEPS } from "../../../../modules/apps/installation/[[...step]]/constants";
 import type {
   OnboardingPageProps,
-  TEventTypeGroup,
   TEventType,
+  TEventTypeGroup,
 } from "../../../../modules/apps/installation/[[...step]]/step-view";
 
 const eventTypeSelect: Prisma.EventTypeSelect = {
@@ -446,6 +445,15 @@ const getCredential = async (
   parsedAppSlug: string
 ): Promise<{ credentialId: number | null; redirect?: RedirectResult }> => {
   let credentialId = getCredentialId(parsedTeamIdParam, appInstalls, user.id);
+  // Apps with a custom setup form collect user-supplied credentials
+  // (e.g. server URL + shared secret) before they're usable.
+  // Skip the silent auto-install and send the user to /apps/<slug>/setup instead.
+  if (!credentialId && appRequiresSetupForm(parsedAppSlug)) {
+    return {
+      credentialId: null,
+      redirect: { redirect: { permanent: false, destination: `/apps/${parsedAppSlug}/setup` } },
+    };
+  }
   if (
     !credentialId &&
     !user.teams.length &&
