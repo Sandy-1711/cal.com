@@ -10,7 +10,7 @@ import type { VideoApiAdapter, VideoCallData } from "@calcom/types/VideoApiAdapt
 import { XMLParser } from "fast-xml-parser";
 import { metadata } from "../_metadata";
 import { type BbbCredentialKey, bbbCredentialKeySchema } from "../zod";
-import { BbbApiError, buildSignedUrl, callBbb, generateMeetingPassword } from "./bbbClient";
+import { BbbApiError, buildSignedUrl, callBbb, generateMeetingPassword, parseBbbResponse } from "./bbbClient";
 
 const log = logger.getSubLogger({ prefix: ["bigbluebuttonvideo/VideoApiAdapter"] });
 
@@ -36,7 +36,9 @@ const minutesBetween = (start: string, end: string) => {
   const startMs = new Date(start).getTime();
   const endMs = new Date(end).getTime();
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
-  return Math.max(1, Math.round((endMs - startMs) / 60000));
+  // Round up so a window with leftover seconds doesn't get BBB to auto-end
+  // the room before event.endTime.
+  return Math.max(1, Math.ceil((endMs - startMs) / 60000));
 };
 
 type RecordingFormat = { type?: string; url?: string };
@@ -73,12 +75,15 @@ const fetchRecordingsXml = async (creds: BbbCredentialKey, params: Record<string
     call: "getRecordings",
     params,
   });
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
     throw new BbbApiError(`BigBlueButton getRecordings failed with HTTP ${response.status}`);
   }
   const body = await response.text();
-  return recordingResponseParser.parse(body);
+  // parseBbbResponse asserts returncode === SUCCESS and converts parser errors
+  // to BbbApiError. Without this check an auth/checksum/server failure would
+  // be silently mapped to "no recordings".
+  return parseBbbResponse(body, "getRecordings", recordingResponseParser);
 };
 
 const BBBVideoApiAdapter = (credential: CredentialPayload): VideoApiAdapter => {
