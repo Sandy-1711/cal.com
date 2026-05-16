@@ -29,7 +29,7 @@ export default function BigBlueButtonSetup() {
             {/* eslint-disable @next/next/no-img-element */}
             <img
               src="/api/app-store/bigbluebuttonvideo/icon.svg"
-              alt="BigBlueButton"
+              alt={t("bigbluebutton_logo_alt")}
               className="h-12 w-12 max-w-2xl"
             />
           </div>
@@ -67,14 +67,14 @@ export default function BigBlueButtonSetup() {
                     type="text"
                     {...form.register("serverUrl")}
                     label={t("bigbluebutton_server_url")}
-                    placeholder="https://bbb.example.com"
+                    placeholder={t("bigbluebutton_server_url_placeholder")}
                   />
                   <TextField
                     required
                     type="password"
                     {...form.register("sharedSecret")}
                     label={t("bigbluebutton_shared_secret")}
-                    placeholder="•••••••••••••"
+                    placeholder={t("bigbluebutton_shared_secret_placeholder")}
                     autoComplete="off"
                   />
                 </fieldset>
