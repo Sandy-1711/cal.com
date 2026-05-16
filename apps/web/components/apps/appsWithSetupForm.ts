@@ -21,3 +21,12 @@ export type AppWithSetupFormSlug = (typeof APPS_WITH_SETUP_FORM)[number];
 
 export const appRequiresSetupForm = (slug: string | null | undefined): boolean =>
   !!slug && (APPS_WITH_SETUP_FORM as readonly string[]).includes(slug);
+
+export type SetupFormRedirect = { permanent: false; destination: string };
+
+// Returns the Next.js redirect object pointing at the app's setup form, or null
+// if the app doesn't require one. Used by /apps/installation/... server-side
+// rendering to skip the silent auto-install for apps that need user-supplied
+// credentials.
+export const setupFormRedirectFor = (slug: string | null | undefined): SetupFormRedirect | null =>
+  appRequiresSetupForm(slug) ? { permanent: false, destination: `/apps/${slug}/setup` } : null;

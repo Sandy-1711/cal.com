@@ -11,7 +11,7 @@ import { getPlaceholderAvatar } from "@calcom/lib/defaultAvatarImage";
 import prisma from "@calcom/prisma";
 import { Prisma } from "@calcom/prisma/client";
 import { eventTypeBookingFields } from "@calcom/prisma/zod-utils";
-import { appRequiresSetupForm } from "@calcom/web/components/apps/appsWithSetupForm";
+import { setupFormRedirectFor } from "@calcom/web/components/apps/appsWithSetupForm";
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from "next";
 import { z } from "zod";
 import { STEPS } from "../../../../modules/apps/installation/[[...step]]/constants";
@@ -448,11 +448,11 @@ const getCredential = async (
   // Apps with a custom setup form collect user-supplied credentials
   // (e.g. server URL + shared secret) before they're usable.
   // Skip the silent auto-install and send the user to /apps/<slug>/setup instead.
-  if (!credentialId && appRequiresSetupForm(parsedAppSlug)) {
-    return {
-      credentialId: null,
-      redirect: { redirect: { permanent: false, destination: `/apps/${parsedAppSlug}/setup` } },
-    };
+  if (!credentialId) {
+    const setupRedirect = setupFormRedirectFor(parsedAppSlug);
+    if (setupRedirect) {
+      return { credentialId: null, redirect: { redirect: setupRedirect } };
+    }
   }
   if (
     !credentialId &&
