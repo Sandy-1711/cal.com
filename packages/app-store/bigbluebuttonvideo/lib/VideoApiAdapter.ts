@@ -86,6 +86,20 @@ const fetchRecordingsXml = async (creds: BbbCredentialKey, params: Record<string
   return parseBbbResponse(body, "getRecordings", recordingResponseParser);
 };
 
+/**
+ * Cal's `VideoApiAdapter` for BigBlueButton. One adapter instance is created
+ * per booking action (create/update/delete/getRecordings) from the user's
+ * encrypted credential. Implements the standard adapter contract plus the
+ * optional recordings methods.
+ *
+ * BBB-specific behavior:
+ * - `event.uid` is used as the `meetingID` so reschedule (updateMeeting) is
+ *   idempotent — BBB returns the existing room when `create` is called with
+ *   the same `meetingID`.
+ * - The moderator password generated at create time is stored in
+ *   `BookingReference.meetingPassword` so `deleteMeeting` can call BBB's
+ *   `/api/end` on cancel.
+ */
 const BBBVideoApiAdapter = (credential: CredentialPayload): VideoApiAdapter => {
   const credentials = decryptCredentialKey(credential);
 

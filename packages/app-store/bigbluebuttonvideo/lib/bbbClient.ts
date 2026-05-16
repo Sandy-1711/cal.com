@@ -1,6 +1,12 @@
 import crypto from "node:crypto";
 import { XMLParser } from "fast-xml-parser";
 
+/**
+ * Typed error for any BigBlueButton failure mode (HTTP error, malformed XML,
+ * or a `<returncode>FAILED</returncode>` payload). Carries the BBB
+ * `messageKey` when available so callers can branch on protocol error codes
+ * (e.g. ignore `notFound` when ending an already-ended meeting).
+ */
 export class BbbApiError extends Error {
   constructor(
     message: string,
@@ -34,12 +40,27 @@ const toQueryString = (params: Record<string, string | number | boolean | undefi
   return search.toString();
 };
 
+/**
+ * Computes the SHA1 checksum BBB requires on every API call:
+ * `sha1(callName + queryString + sharedSecret)`. The `queryString` must be the
+ * exact URL-encoded body that will be sent (without the leading `?` and
+ * without `&checksum=...`).
+ *
+ * @see https://docs.bigbluebutton.org/development/api/#usage
+ */
 export const buildChecksum = (call: string, queryString: string, sharedSecret: string) =>
   crypto
     .createHash("sha1")
     .update(call + queryString + sharedSecret)
     .digest("hex");
 
+/**
+ * Builds a fully-signed BBB API URL ready to fetch (or to hand to the user as
+ * a join link). Handles the protocol quirks the rest of the code doesn't have
+ * to care about: appending `/bigbluebutton` to the server URL if missing,
+ * stripping trailing slashes, dropping params whose value is `undefined`, and
+ * computing the checksum from the same URL-encoded body that ends up on the wire.
+ */
 export const buildSignedUrl = ({
   serverUrl,
   call,
@@ -99,6 +120,11 @@ export const parseBbbResponse = (
   return parsed;
 };
 
+/**
+ * Calls a BBB API endpoint and asserts a SUCCESS response. Throws `BbbApiError`
+ * for HTTP failures, malformed XML, or `<returncode>FAILED</returncode>`. Adds
+ * a 10-second timeout unless the caller supplies their own `init.signal`.
+ */
 export const callBbb = async ({
   serverUrl,
   sharedSecret,
@@ -127,4 +153,9 @@ export const callBbb = async ({
   return parsed.response;
 };
 
+/**
+ * Returns a fresh 32-character hex string used as a BBB `attendeePW` /
+ * `moderatorPW`. Sized for entropy comparable to a UUIDv4 so the password
+ * isn't a guessability concern for room access.
+ */
 export const generateMeetingPassword = () => crypto.randomBytes(16).toString("hex");
