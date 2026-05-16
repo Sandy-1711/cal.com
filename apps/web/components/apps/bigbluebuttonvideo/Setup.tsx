@@ -41,16 +41,24 @@ export default function BigBlueButtonSetup() {
                 form={form}
                 handleSubmit={async (values) => {
                   setErrorMessage("");
-                  const res = await fetch("/api/integrations/bigbluebuttonvideo/add", {
-                    method: "POST",
-                    body: JSON.stringify(values),
-                    headers: { "Content-Type": "application/json" },
-                  });
-                  const json = await res.json();
-                  if (!res.ok) {
-                    setErrorMessage(json?.message || t("something_went_wrong"));
-                  } else {
-                    router.push(json.url);
+                  try {
+                    const res = await fetch("/api/integrations/bigbluebuttonvideo/add", {
+                      method: "POST",
+                      body: JSON.stringify(values),
+                      headers: { "Content-Type": "application/json" },
+                    });
+                    const json = await res.json().catch(() => null);
+                    if (!res.ok) {
+                      setErrorMessage(json?.message || t("something_went_wrong"));
+                      return;
+                    }
+                    if (json?.url) {
+                      router.push(json.url);
+                    } else {
+                      setErrorMessage(t("something_went_wrong"));
+                    }
+                  } catch {
+                    setErrorMessage(t("something_went_wrong"));
                   }
                 }}>
                 <fieldset className="stack-y-2" disabled={form.formState.isSubmitting}>
