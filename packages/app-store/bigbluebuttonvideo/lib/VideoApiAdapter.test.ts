@@ -74,6 +74,9 @@ describe("BBBVideoApiAdapter", () => {
     expect(result.password).toMatch(/^[0-9a-f]{32}$/);
     expect(result.url).toMatch(/\/bigbluebutton\/api\/join\?/);
     expect(result.url).toMatch(/fullName=Guest/);
+
+    const passwordInJoinUrl = new URL(result.url).searchParams.get("password");
+    expect(passwordInJoinUrl).toBe(result.password);
   });
 
   it("updateMeeting reuses meetingId and moderator password from booking reference", async () => {

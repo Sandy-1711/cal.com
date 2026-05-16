@@ -114,7 +114,7 @@ const BBBVideoApiAdapter = (credential: CredentialPayload): VideoApiAdapter => {
         serverUrl: credentials.serverUrl,
         sharedSecret: credentials.sharedSecret,
         call: "join",
-        params: { meetingID, password: attendeePW, fullName: "Guest" },
+        params: { meetingID, password: moderatorPW, fullName: "Guest" },
       });
 
       return {
@@ -150,7 +150,7 @@ const BBBVideoApiAdapter = (credential: CredentialPayload): VideoApiAdapter => {
         serverUrl: credentials.serverUrl,
         sharedSecret: credentials.sharedSecret,
         call: "join",
-        params: { meetingID, password: attendeePW, fullName: "Guest" },
+        params: { meetingID, password: moderatorPW, fullName: "Guest" },
       });
 
       return {
