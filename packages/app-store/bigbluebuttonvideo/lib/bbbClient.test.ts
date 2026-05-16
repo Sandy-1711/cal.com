@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BbbApiError, buildChecksum, buildSignedUrl, generateMeetingPassword } from "./bbbClient";
+import { generateTextResponse } from "../../_utils/testUtils";
+import {
+  BbbApiError,
+  buildChecksum,
+  buildSignedUrl,
+  callBbb,
+  generateMeetingPassword,
+  parseBbbResponse,
+} from "./bbbClient";
 
 describe("buildChecksum", () => {
   it("computes SHA1(call + queryString + sharedSecret) deterministically", () => {
@@ -123,5 +131,83 @@ describe("BbbApiError", () => {
     expect(err.messageKey).toBe("notFound");
     expect(err.name).toBe("BbbApiError");
     expect(err).toBeInstanceOf(Error);
+  });
+});
+
+describe("parseBbbResponse", () => {
+  it("returns the parsed object when returncode === SUCCESS", () => {
+    const xml = `<?xml version="1.0"?><response><returncode>SUCCESS</returncode><meetingID>m1</meetingID></response>`;
+    const result = parseBbbResponse(xml, "create");
+    expect(result.response?.returncode).toBe("SUCCESS");
+  });
+
+  it("throws BbbApiError with the BBB message and messageKey on FAILED", () => {
+    const xml = `<?xml version="1.0"?><response><returncode>FAILED</returncode><messageKey>checksumError</messageKey><message>Invalid checksum</message></response>`;
+    try {
+      parseBbbResponse(xml, "create");
+      throw new Error("expected to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(BbbApiError);
+      expect((err as BbbApiError).message).toBe("Invalid checksum");
+      expect((err as BbbApiError).messageKey).toBe("checksumError");
+    }
+  });
+
+  it("throws BbbApiError when XML is malformed", () => {
+    const malformed = "<<<not xml>>>";
+    expect(() => parseBbbResponse(malformed, "create")).toThrow(BbbApiError);
+  });
+
+  it("throws BbbApiError when body has no <response> root", () => {
+    const xml = `<?xml version="1.0"?><other>nope</other>`;
+    expect(() => parseBbbResponse(xml, "create")).toThrow(BbbApiError);
+  });
+});
+
+describe("callBbb", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const baseArgs = {
+    serverUrl: "https://bbb.example.com",
+    sharedSecret: "secret",
+    call: "getMeetings",
+  };
+
+  it("throws BbbApiError on non-OK HTTP status", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("", { status: 500, statusText: "Internal Server Error" })
+    );
+    await expect(callBbb(baseArgs)).rejects.toBeInstanceOf(BbbApiError);
+    await expect(callBbb(baseArgs)).rejects.toThrow(/HTTP 500/);
+  });
+
+  it("throws BbbApiError when BBB returns FAILED in the XML body", async () => {
+    const failedXml = `<?xml version="1.0"?><response><returncode>FAILED</returncode><messageKey>notFound</messageKey><message>Not found</message></response>`;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(generateTextResponse({ text: failedXml }));
+    try {
+      await callBbb(baseArgs);
+      throw new Error("expected to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(BbbApiError);
+      expect((err as BbbApiError).messageKey).toBe("notFound");
+    }
+  });
+
+  it("throws BbbApiError when the response body is malformed XML", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(generateTextResponse({ text: "<<<garbage>>>" }));
+    await expect(callBbb(baseArgs)).rejects.toBeInstanceOf(BbbApiError);
+  });
+
+  it("attaches AbortSignal.timeout when the caller does not provide one", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      generateTextResponse({
+        text: `<?xml version="1.0"?><response><returncode>SUCCESS</returncode></response>`,
+      })
+    );
+    await callBbb(baseArgs);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 });
