@@ -75,8 +75,12 @@ describe("BBBVideoApiAdapter", () => {
     expect(result.url).toMatch(/\/bigbluebutton\/api\/join\?/);
     expect(result.url).toMatch(/fullName=Guest/);
 
+    // The join URL embeds the attendee password (least privilege for the
+    // shared link). The moderator password stays internal on
+    // BookingReference.meetingPassword and is reused by deleteMeeting.
     const passwordInJoinUrl = new URL(result.url).searchParams.get("password");
-    expect(passwordInJoinUrl).toBe(result.password);
+    expect(passwordInJoinUrl).toMatch(/^[0-9a-f]{32}$/);
+    expect(passwordInJoinUrl).not.toBe(result.password);
   });
 
   it("updateMeeting reuses meetingId and moderator password from booking reference", async () => {

@@ -129,11 +129,17 @@ const BBBVideoApiAdapter = (credential: CredentialPayload): VideoApiAdapter => {
         },
       });
 
+      // The shared join URL embeds the attendee password (least privilege).
+      // The moderator password is kept in the returned `password` so it's
+      // persisted to BookingReference.meetingPassword and reused by
+      // deleteMeeting to call BBB's /api/end. Per-recipient URLs (host gets
+      // moderator, guest gets attendee) would require extending VideoCallData
+      // and the email layer — tracked as follow-up.
       const joinUrl = buildSignedUrl({
         serverUrl: credentials.serverUrl,
         sharedSecret: credentials.sharedSecret,
         call: "join",
-        params: { meetingID, password: moderatorPW, fullName: "Guest" },
+        params: { meetingID, password: attendeePW, fullName: "Guest" },
       });
 
       return {
@@ -169,7 +175,7 @@ const BBBVideoApiAdapter = (credential: CredentialPayload): VideoApiAdapter => {
         serverUrl: credentials.serverUrl,
         sharedSecret: credentials.sharedSecret,
         call: "join",
-        params: { meetingID, password: moderatorPW, fullName: "Guest" },
+        params: { meetingID, password: attendeePW, fullName: "Guest" },
       });
 
       return {
