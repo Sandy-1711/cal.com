@@ -58,7 +58,7 @@ export const buildSignedUrl = ({
   return `${apiBase}/api/${call}?${queryString}${separator}checksum=${checksum}`;
 };
 
-type BbbResponseRoot = {
+export type BbbResponseRoot = {
   response?: {
     returncode?: string;
     message?: string;
@@ -67,7 +67,25 @@ type BbbResponseRoot = {
   };
 };
 
-const ensureSuccess = (parsed: BbbResponseRoot, call: string) => {
+// Hard timeout for any outbound BBB call. Without this, an unreachable BBB
+// server can pin a Cal request indefinitely.
+const BBB_REQUEST_TIMEOUT_MS = 10_000;
+
+// Parses an XML body returned by a BBB API call and asserts that
+// `<response><returncode>SUCCESS</returncode>...</response>` is present.
+// Any parser error or BBB-reported failure becomes a typed BbbApiError so
+// callers don't have to discriminate between native and protocol errors.
+export const parseBbbResponse = (
+  body: string,
+  call: string,
+  parser: XMLParser = xmlParser
+): BbbResponseRoot => {
+  let parsed: BbbResponseRoot;
+  try {
+    parsed = parser.parse(body) as BbbResponseRoot;
+  } catch {
+    throw new BbbApiError(`BigBlueButton ${call} returned an unparseable response`);
+  }
   const root = parsed?.response;
   if (!root) {
     throw new BbbApiError(`BigBlueButton ${call} returned an unparseable response`);
@@ -78,7 +96,7 @@ const ensureSuccess = (parsed: BbbResponseRoot, call: string) => {
       typeof root.messageKey === "string" ? root.messageKey : undefined
     );
   }
-  return root;
+  return parsed;
 };
 
 export const callBbb = async ({
@@ -95,15 +113,18 @@ export const callBbb = async ({
   init?: RequestInit;
 }) => {
   const url = buildSignedUrl({ serverUrl, call, params: params ?? {}, sharedSecret });
-  const response = await fetch(url, init);
+  const response = await fetch(url, {
+    ...init,
+    signal: init?.signal ?? AbortSignal.timeout(BBB_REQUEST_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     throw new BbbApiError(`BigBlueButton ${call} request failed with HTTP ${response.status}`);
   }
 
   const body = await response.text();
-  const parsed = xmlParser.parse(body) as BbbResponseRoot;
-  return ensureSuccess(parsed, call);
+  const parsed = parseBbbResponse(body, call);
+  return parsed.response;
 };
 
 export const generateMeetingPassword = () => crypto.randomBytes(16).toString("hex");
