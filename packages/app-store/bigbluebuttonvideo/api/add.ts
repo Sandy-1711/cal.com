@@ -24,7 +24,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const teamIdParam = req.query.teamId;
-  const teamId = teamIdParam ? Number(teamIdParam) : null;
+  if (Array.isArray(teamIdParam)) {
+    return res.status(400).json({ message: "teamId must be a single value" });
+  }
+  let teamId: number | null = null;
+  if (typeof teamIdParam === "string" && teamIdParam.length > 0) {
+    const parsedTeamId = Number(teamIdParam);
+    if (!Number.isInteger(parsedTeamId) || parsedTeamId <= 0) {
+      return res.status(400).json({ message: "Invalid teamId" });
+    }
+    teamId = parsedTeamId;
+  }
 
   await throwIfNotHaveAdminAccessToTeam({ teamId, userId: req.session.user.id });
 
