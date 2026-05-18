@@ -1,18 +1,17 @@
-import { shallow } from "zustand/shallow";
-
 import type { Dayjs } from "@calcom/dayjs";
 import dayjs from "@calcom/dayjs";
+import { useSlotsViewOnSmallScreen } from "@calcom/embed-core/embed-iframe";
 import { useBookerStoreContext } from "@calcom/features/bookings/Booker/BookerStoreProvider";
 import type { DatePickerClassNames } from "@calcom/features/bookings/Booker/types";
+import type { Slots } from "@calcom/features/bookings/types";
 import { DatePicker as DatePickerComponent } from "@calcom/features/calendars/components/DatePicker";
-import { useNonEmptyScheduleDays } from "@calcom/web/modules/schedules/hooks/useNonEmptyScheduleDays";
 import { weekdayToWeekIndex } from "@calcom/lib/dayjs";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import type { User } from "@calcom/prisma/client";
 import type { PeriodData } from "@calcom/types/Event";
-import { useSlotsViewOnSmallScreen } from "@calcom/embed-core/embed-iframe";
-
-import type { Slots } from "@calcom/features/bookings/types";
+import { useNonEmptyScheduleDays } from "@calcom/web/modules/schedules/hooks/useNonEmptyScheduleDays";
+import { useRef } from "react";
+import { shallow } from "zustand/shallow";
 
 const useMoveToNextMonthOnNoAvailability = ({
   browsingDate,
@@ -25,6 +24,10 @@ const useMoveToNextMonthOnNoAvailability = ({
   isLoading: boolean;
   onMonthChange: (date: Dayjs) => void;
 }) => {
+  // Only auto-advance once per mount so a user navigating back to a fully
+  // booked current month isn't bounced forward again on every render.
+  const hasAutoAdvancedRef = useRef(false);
+
   if (isLoading) {
     return {
       moveToNextMonthOnNoAvailability: () => {
@@ -38,6 +41,9 @@ const useMoveToNextMonthOnNoAvailability = ({
   );
 
   const moveToNextMonthOnNoAvailability = () => {
+    if (hasAutoAdvancedRef.current) {
+      return;
+    }
     const currentMonth = dayjs().startOf("month").format("YYYY-MM");
     const browsingMonth = browsingDate.format("YYYY-MM");
     // Not meeting the criteria to move to next month
@@ -45,6 +51,7 @@ const useMoveToNextMonthOnNoAvailability = ({
     if (currentMonth != browsingMonth || nonEmptyScheduleDaysInBrowsingMonth.length) {
       return;
     }
+    hasAutoAdvancedRef.current = true;
     onMonthChange(browsingDate.add(1, "month"));
   };
   return {
