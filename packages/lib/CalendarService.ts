@@ -691,7 +691,7 @@ export default abstract class BaseCalendarService implements Calendar {
             const value = prop.getFirstValue();
             return typeof value === "string" && value.toLowerCase() === `mailto:${credentialEmail}`;
           });
-          const partstat = (myAttendee as any)?.jCal?.[1]?.partstat as string | undefined;
+          const partstat = myAttendee?.getParameter("partstat");
           if (partstat === "NEEDS-ACTION" || partstat === "DECLINED") return;
         }
 
