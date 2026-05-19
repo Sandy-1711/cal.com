@@ -835,6 +835,17 @@ describe("CalendarService - getAvailability - PARTSTAT filtering", () => {
     expect(busy).toHaveLength(1);
   });
 
+  // TENTATIVE is intentionally treated as busy (matches Google's default).
+  // This test guards against a future change that would also skip Tentative.
+  it("keeps events where the user's PARTSTAT is TENTATIVE", async () => {
+    const service = new TestCalendarService();
+    mockFetchReturning(buildIcsPayload({ partstat: "TENTATIVE" }));
+
+    const busy = await callGetAvailability(service);
+
+    expect(busy).toHaveLength(1);
+  });
+
   it("keeps events with no attendees (self-created events)", async () => {
     const service = new TestCalendarService();
     mockFetchReturning(buildIcsPayload({ includeAttendee: false }));
